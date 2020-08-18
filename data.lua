@@ -28,6 +28,8 @@ require("prototypes/recipes")
 --require("prototypes/overrides/angel-recipe-overrides")
 --require("prototypes/overrides/angel-tech-overrides")
 
+require("prototypes/generator")
+
 
 --formula to calulate steam consumption
 --flowrate (in units/s) * heat capacity (J/unit/C) * (T - 15 C) = wattage

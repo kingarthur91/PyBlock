@@ -2,6 +2,7 @@ local fun = require('functions/functions')
 require('prototypes/updates/pyhightech-updates')
 require('prototypes/updates/pyalienlife-updates')
 require('prototypes/updates/ddc-coal-updates')
+require('prototypes/updates/generator-updates')
 
 RECIPE("bio-reactor"):replace_ingredient('advanced-circuit','electronic-circuit')
 

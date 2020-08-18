@@ -1,5 +1,7 @@
 --require("functions/autobuilder")
 
+require "util"
+
 --rare earth and moly need to show up around sci 2
 
 local startchunk = false
@@ -36,66 +38,12 @@ local by = 32
 local fx = tx
 local fy = ty
 
-for i = 0,4096 do
-
-	table.insert(oldtiles,{name=waters[math.random(1,2)],position={fx,fy}})
-
-	fx = fx + 1
-
-	if fx == tx + 64 then
-
-		fx = tx
-		fy = fy + 1
-
-	end
-
-end
-
-game.surfaces["nauvis"].set_tiles(oldtiles)
-
-local crap = game.surfaces["nauvis"].find_entities({{tx,ty},{bx,by}})
-
-for _,c in pairs(crap) do
-
---log(serpent.block(c))
-if c ~= game.player and c.name ~= 'seaweed' and c.name ~= 'fish' then
-
-c.destroy()
-
-end
-
-end
-
 --setup spawn area
 
 global.firstrock = true
 global.secondrock = true
 
 local t
-
-for x = 0,10 do
-
-	table.insert(Tiles,{name="landfill", position={X,Y}})
-
-	X = X + 1
-
-		if X == 2 then
-
-			X = -1
-
-			Y = Y + 1
-
-			if Y == 2 then
-
-				Y = -1
-
-			end
-
-		end
-
-end
-
-game.surfaces["nauvis"].set_tiles(Tiles)
 
 end)
 
@@ -220,6 +168,15 @@ local Rocks =
 	"tar-patch"
 	}
 
+-- Create a set of the rock types, for quick determination so they don't accidentally get deleted when the next chunk generates
+local function Set (list)
+  local set = {}
+  for _, l in ipairs(list) do set[l] = true end
+  return set
+end
+
+local RocksSet = Set(Rocks)
+
 --local firstrock = true
 
 local loot_table_fuelrod =
@@ -283,7 +240,6 @@ elseif tx == 0 and ty == 0 then
 	--log(serpent.block(event.area))
 else
 
-
 		local crap = game.surfaces["nauvis"].find_entities({{tx,ty},{bx,by}})
 
 		for _,c in pairs(crap) do
@@ -292,7 +248,7 @@ else
 			--log(serpent.block(c.name))
 			--log(serpent.block(c.position))
 
-			if c.name ~= "iron-rock" and c.name ~= 'seaweed' and c.name ~= 'fish' then
+			if RocksSet[c.name] == nil and c.name ~= 'seaweed' and c.name ~= 'fish' then
 			--log('destroying')
 			c.destroy()
 
@@ -315,110 +271,111 @@ else
 		local fx = tx
 		local fy = ty
 
-		for i = 0,1024 do
-
-		--check for landfill from another chunk and dont replace
-			if game.surfaces["nauvis"].get_tile(fx,fy).name == "landfill" then
-
-
-
-			else
-
-				--local ent = game.surfaces["nauvis"].find_entities({{fx,fy},{fx,fy}})
-
-				--for _, e in pairs(ent) do
-
-				--log(e.name)
-
-					--if e.name == "iron-rock" then
-
-					--else
-						table.insert(oldtiles,{name=waters[math.random(1,2)],position={fx,fy}})
-
-					--end
-
-				--end
-
-			end
-
-			fx = fx + 1
-
-			if fx == tx + 32 then
-
-				fx = tx
-				fy = fy + 1
-
-			end
-
-		end
-
-		game.surfaces["nauvis"].set_tiles(oldtiles)
-
-		local crap = game.surfaces["nauvis"].find_entities({{tx,ty},{bx,by}})
-
-		for _,c in pairs(crap) do
-			--log(serpent.block(c.name))
-			if c.name ~= 'fish' and c.name ~= 'seaweed' then
-				c.destroy()
-			end
-		end
-	--end
 end
---setting stuff in chunk
-local SelectedRock = math.random(1,25)
 
-local Randx = math.random(tx+7,bx-7)
-local Randy = math.random(ty+7,by-7)
+-- -----------------------------------------------------------------------------------------------------------------------------
+-- Helper Functions
+-- -----------------------------------------------------------------------------------------------------------------------------
 
-local tiles = {}
+	-- Multiply the amount certain resources have
+	-- Separate this into a second function for easy extention
+	local function amplifyAmountBasedOnRock(rock, amount)
 
-local x = Randx - 7
-local y = Randy - 7
-
-local a=0
-local b=0
-
-local RandChance
-
-	if global.firstrock == true then
-		SelectedRock = 1
-		RandChance = math.random(0,30)
-	elseif global.secondrock == true and global.firstrock == false then
-		SelectedRock = 2
-		RandChance = math.random(0,30)
-	else
-		RandChance = math.random(0,240)
-	end
-	if RandChance == 5 then
-		for i = 0,169 do
-			table.insert(tiles,{name="landfill", position={x,y}})
-			x = x+1
-			a=a+1
-				if a==13 then
-					x = x-13
-					y = y+1
-					b = b+1
-					a=0
-					if b==13 then
-					y=y-13
-					b=0
-					end
-				end
-		end
-		game.surfaces["nauvis"].set_tiles(tiles)
-		local rock = Rocks[SelectedRock]
 		if rock == 'oil-mk01' or rock == 'oil-mk02' or rock == 'oil-mk03' or rock == 'oil-mk04' or rock == 'tar-patch' then
-			amount = math.random(1000000,5000000)
-		else
-			amount = math.random(250000,1000000)
+			return amount * 4
 		end
-		game.surfaces["nauvis"].create_entity{name=rock,position={Randx,Randy},amount=amount}
-		if global.firstrock == true then
-			global.firstrock = false
-		elseif global.firstrock == false and global.secondrock == true then
-			global.secondrock = false
+		
+		return amount
+
+	end
+
+	-- Caluclate the distance the possible placement position is from the starting area, calculate amount based on this distance
+	local function getDistanceBasedAmount(position, rock)
+
+		function calculateFactor(distance, exponent)
+			if distance< 1 and exponent < 1 then
+				return distance
+			end
+			
+			return distance^exponent
+		end
+		
+		amount = 1000 * calculateFactor(util.distance({x=0, y=0},
+					{x = math.abs(position.x), y = math.abs(position.y)}), 1.05)
+
+		amount = math.floor(amount)
+		
+		amount = amplifyAmountBasedOnRock(rock, amount)
+		
+		if amount > 1e9 then
+			amount = 1e9
+		elseif amount < 250000 then
+			amount = math.random(250000, 400000)
+		end
+		
+		return amount
+
+	end
+
+-- -----------------------------------------------------------------------------------------------------------------------------
+-- Place resources on generated islands
+-- -----------------------------------------------------------------------------------------------------------------------------
+
+local placementChance = math.random(1,5)
+local rockSelection = 0
+local forcePlace = false
+
+	-- Determine Resource
+	if global.firstrock == true then
+		rockSelection = 1
+		forcePlace = true
+	elseif global.secondrock == true and global.firstrock == false then
+		rockSelection = 2
+		forcePlace = true
+	else
+		rockSelection = math.random(1,25)
+	end
+
+	-- Determine if the Resource can be placed, 
+	local possiblePosition = event.surface.find_non_colliding_position_in_box(Rocks[rockSelection], event.area, 1)
+
+	if possiblePosition ~= nil then
+		
+		local canPlaceEntity = event.surface.can_place_entity{name=Rocks[rockSelection], position=possiblePosition}
+		
+		-- If there are no other resources nearby, roll the chance to place the resource
+		local nearbyEntities = event.surface.find_entities_filtered{position=possiblePosition, radius=25, name=Rocks, limit=1}
+
+		if canPlaceEntity == true and nearbyEntities ~= nil and #nearbyEntities == 0 then
+			if forcePlace == true or placementChance == 1 then
+			
+				local amount
+			
+				-- Now that we have confirmed that we can generate a resource, determine the amount
+				if settings.startup["pyblock-ore-distance-richness"].value then
+					amount = getDistanceBasedAmount(possiblePosition, Rocks[rockSelection])
+				else
+					-- Base generation setting
+					amount = amplifyAmountBasedOnRock(Rocks[rockSelection], math.random(250000,1000000))
+				end
+		
+				local entity = game.surfaces["nauvis"].create_entity{name=Rocks[rockSelection], position=possiblePosition, amount=amount}
+				
+				if entity ~= nil and global.firstrock == true then
+					global.firstrock = false
+				elseif entity ~= nil and global.secondrock == true and global.firstrock == false then
+					global.secondrock = false
+				end
+			end
 		end
 	end
+	
+-- -----------------------------------------------------------------------------------------------------------------------------
+-- Place ship parts in chunk
+-- -----------------------------------------------------------------------------------------------------------------------------
+
+local RandChance = math.random(0,240)
+
 	if RandChance == 6 then
 		local ship = game.surfaces['nauvis'].create_entity{name = crashedshipparts[math.random(1,3)], position={math.random(tx+3,bx-3),math.random(ty+3,by-3)}, force=game.players[1].force}
 		local loot_rand_pick = math.random(1,25) 
